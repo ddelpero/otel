@@ -49,7 +49,7 @@ func (l *Logger) Error(ctx context.Context, msg string, fields ...zap.Field) {
 		defer childSpan.End()
 		childSpan.RecordError(errors.New(msg), trace.WithAttributes(attr...))
 		childSpan.SetStatus(codes.Error, msg)
-		span.SetStatus(codes.Error, msg)
+		// span.SetStatus(codes.Error, msg) // set the outer span as an error
 	}
 }
 
