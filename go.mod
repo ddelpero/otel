@@ -1,4 +1,4 @@
-module github.com/ddelpero/otel_logger
+module github.com/ddelpero/otel
 
 go 1.22.7
 

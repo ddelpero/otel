@@ -1,14 +1,16 @@
-package otel_logger
+package logger
 
 import (
 	"context"
 	"errors"
 
+	"github.com/ddelpero/otel/runtime"
+
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
+	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 	"go.opentelemetry.io/otel/trace"
-
 	"go.uber.org/zap"
 )
 
@@ -34,6 +36,7 @@ func (l *Logger) Info(ctx context.Context, msg string, fields ...zap.Field) {
 	l.logger.Info(msg, fields...)
 	span, attr := l.getSpanAndAttributes(ctx, fields...)
 	l.addEventToSpan(span, msg, attr)
+	l.addFrameToSpan(span)
 	// Maybe future option to log info to span
 	// _, childSpan := otel.Tracer(l.name).Start(ctx, "Log Info")
 	// childSpan.AddEvent(msg, trace.WithAttributes(attr...))
@@ -49,6 +52,7 @@ func (l *Logger) Error(ctx context.Context, msg string, fields ...zap.Field) {
 		defer childSpan.End()
 		childSpan.RecordError(errors.New(msg), trace.WithAttributes(attr...))
 		childSpan.SetStatus(codes.Error, msg)
+		l.addFrameToSpan(childSpan)
 		// span.SetStatus(codes.Error, msg) // set the outer span as an error
 	}
 }
@@ -58,24 +62,28 @@ func (l *Logger) Debug(ctx context.Context, msg string, fields ...zap.Field) {
 	l.logger.Debug(msg, fields...)
 	span, attr := l.getSpanAndAttributes(ctx, fields...)
 	l.addEventToSpan(span, msg, attr)
+	l.addFrameToSpan(span)
 }
 
 func (l *Logger) Warn(ctx context.Context, msg string, fields ...zap.Field) {
 	l.logger.Warn(msg, fields...)
 	span, attr := l.getSpanAndAttributes(ctx, fields...)
 	l.addEventToSpan(span, msg, attr)
+	l.addFrameToSpan(span)
 }
 
 func (l *Logger) Fatal(ctx context.Context, msg string, fields ...zap.Field) {
 	l.logger.Fatal(msg, fields...)
 	span, attr := l.getSpanAndAttributes(ctx, fields...)
 	l.addEventToSpan(span, msg, attr)
+	l.addFrameToSpan(span)
 }
 
 func (l *Logger) Panic(ctx context.Context, msg string, fields ...zap.Field) {
 	l.logger.Panic(msg, fields...)
 	span, attr := l.getSpanAndAttributes(ctx, fields...)
 	l.addEventToSpan(span, msg, attr)
+	l.addFrameToSpan(span)
 }
 
 func (l *Logger) zapFieldsToAttributes(fields ...zap.Field) []attribute.KeyValue {
@@ -100,4 +108,15 @@ func (l *Logger) addEventToSpan(span trace.Span, msg string, attrributes []attri
 		return
 	}
 	span.AddEvent(msg, trace.WithAttributes(attrributes...))
+}
+
+func (l *Logger) addFrameToSpan(span trace.Span) {
+	if span == nil {
+		return
+	}
+	frame := runtime.GetFrame(4)
+
+	span.SetAttributes(semconv.CodeFunction(frame.Function))
+	span.SetAttributes(semconv.CodeFilepath(frame.File))
+	span.SetAttributes(semconv.CodeLineNumber(frame.Line))
 }
